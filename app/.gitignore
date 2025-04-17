@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+# Virtual Environment
+venv/
+env/
+.chatbot/
+*.env
+.env
+
+# VS Code
+.vscode/
+
+# Pytest
+.cache/
+.pytest_cache/
+
+# IDEs
+.idea/
+*.iml
+
+# Logs
+*.log
+
+# macOS
+.DS_Store
+
+# Databases
+*.db
+
+# Compiled
+build/
+dist/
+*.egg-info/
+
+chat-env/
