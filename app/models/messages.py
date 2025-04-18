@@ -8,18 +8,14 @@ class FileItem(BaseModel):
 
 class CardItem(BaseModel):
     title: str
-    description: Optional[str] = None
-    button_text: Optional[str] = None
-    button_url: Optional[str] = None
-
-class Content(BaseModel):
-    type: str  # Possible values: 'text', 'image with text', 'file with text', 'card with text'
-    text: Optional[str] = None
-    files: Optional[List[FileItem]] = None
-    image_url: Optional[str] = None
-    card: Optional[CardItem] = None
+    description: Optional[List[str]] = None
+    button_text: Optional[List[str]] = None
+    button_url: Optional[List[str]] = None
 
 class Message(BaseModel):
-    sender: str
+    sender: Optional[str] = None  # Sender's name or ID
     timestamp: Optional[datetime] = datetime.now()  # Using datetime directly
-    content: Content
+    type: Optional[str] = None  # Possible values: 'text', 'image with text', 'file with text', 'card with text'
+    text: str = None  # Text content of the message
+    files: Optional[List[FileItem]] = None  # List of attached files
+    card: Optional[CardItem] = None  # Card content of the message

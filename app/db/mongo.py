@@ -33,11 +33,29 @@ async def get_messages(user_id: str, session_id: str) -> List[Dict]:
     
     return messages
 
+#get user sessions
+async def get_sessions(user_id: str) -> List[str]:
+    try:
+        db = client[user_id]
+        collections = await db.list_collection_names()
 
 
+        return collections
+    except Exception as e:
+        return {
+            "error": str(e)
+        }
+    
 # Function to get the MongoDB client
 async def get_mongo_client():
     try:
+        client = AsyncIOMotorClient(MONGO_URI)
+        # Test if the client is connected by listing the databases
+        await client.server_info()  # This will raise an error if the connection fails
+        return client
+    except Exception as e:
+        print(f"Failed to connect to MongoDB: {e}")
+        return None
         client = AsyncIOMotorClient(MONGO_URI)
         # Test if the client is connected by listing the databases
         await client.server_info()  # This will raise an error if the connection fails
@@ -63,11 +81,15 @@ async def test_connection():
     else:
         print("Failed to connect to MongoDB.")
 
+
 if __name__ == "__main__":
 
-    messages = asyncio.run(get_messages("user1", "session1"))
-    print(messages)
-
+    sessions = asyncio.run(get_sessions("user12"))
+    print(sessions)
+    
+    # messages = asyncio.run(get_messages("user1", "session1"))
+    # print(messages)
+    
     # asyncio.run(test_connection())
 
     # asyncio.run(insert_message("user1", "session1", {"message": "Hello"}))
