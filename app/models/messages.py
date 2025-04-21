@@ -2,20 +2,39 @@ from pydantic import BaseModel
 from typing import List, Union, Optional
 from datetime import datetime
 
-class FileItem(BaseModel):
-    filename: str
-    file_url: str
+class DesiredOutput(BaseModel):
+    id: Optional[str] = None
+    title: str    
+    description: Optional[str] = None
+    type: Optional[str] = None
+    path: str
 
-class CardItem(BaseModel):
-    title: str
-    description: Optional[List[str]] = None
-    button_text: Optional[List[str]] = None
-    button_url: Optional[List[str]] = None
+class AgentItem(BaseModel):
+    name: str    
+    role: str
+    prompt: str
+    model: str
+    avatar: str
+
+class OutputFiles(BaseModel):
+    id: Optional[str] = None
+    title: str    
+    description: Optional[str] = None
+    type: Optional[str] = None
+    path: str
 
 class Message(BaseModel):
-    sender: Optional[str] = None  # Sender's name or ID
-    timestamp: Optional[datetime] = datetime.now()  # Using datetime directly
-    type: Optional[str] = None  # Possible values: 'text', 'image with text', 'file with text', 'card with text'
+    message_id: Optional[str] = None
     text: str = None  # Text content of the message
-    files: Optional[List[FileItem]] = None  # List of attached files
-    card: Optional[CardItem] = None  # Card content of the message
+    # sender: Optional[str] = None  # Sender's name or ID
+    desired_output: Optional[List[DesiredOutput]] = None  # List of attached files
+    agents: Optional[List[AgentItem]] = None  # Card content of the message
+    timestamp: Optional[datetime] = datetime.now()  # Using datetime directly
+    output_files:Optional[List[OutputFiles]] = None
+    type: Optional[str] = None  # Possible values: 'text', 'image with text', 'file with text', 'card with text'
+
+
+class Sessions(BaseModel):
+    session_id: str
+    session_name: str
+    messages: List[Message]

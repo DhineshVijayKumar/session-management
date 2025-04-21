@@ -1,8 +1,13 @@
 import os
 import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
+from utils.mongo_exception import CollectionNotFoundError, MongoOperationError, DocumentNotFoundError
+from utils.helpers import timestampToISOFormat
+from pymongo.errors import PyMongoError
 from dotenv import load_dotenv
 from typing import Dict, List
+from models.messages import Message
+from uuid import uuid4
 
 # Load environment variables from .env file
 load_dotenv()
@@ -11,85 +16,81 @@ load_dotenv()
 MONGO_URI = os.getenv("MONGO_URI")
 client = AsyncIOMotorClient(MONGO_URI)
 
-async def insert_message(user_id: str, session_id: str, msg: Dict) -> str:
-    db = client[user_id]
-    collection = db[session_id]
-    result = await collection.insert_one(msg)
-    return str(result.inserted_id)
-
-async def get_messages(user_id: str, session_id: str) -> List[Dict]:
-    db = client[user_id]
-    collection = db[session_id]
-    
-    # No need to check if the collection exists because MongoDB handles it for you
-    cursor = collection.find({})
-    messages = []
-    async for doc in cursor:
-        doc["_id"] = str(doc["_id"])  # Convert ObjectId to string
-        messages.append(doc)
-    
-    if not messages:
-        return [{"error": "No messages found"}]
-    
-    return messages
-
-#get user sessions
-async def get_sessions(user_id: str) -> List[str]:
+async def create_session(user_id:str, session_name:str):
     try:
         db = client[user_id]
-        collections = await db.list_collection_names()
+        collection = db["session"]
 
+        session_id = str(uuid4())
+        await collection.insert_one({
+            "session_id": session_id,
+            "session_name": session_name,
+            "messages": []
+        })
+        return session_id
 
-        return collections
-    except Exception as e:
-        return {
-            "error": str(e)
-        }
-    
-# Function to get the MongoDB client
-async def get_mongo_client():
+    except PyMongoError as e:
+        raise MongoOperationError(f"Database error: {str(e)}")
+
+async def get_sessions(user_id: str):
     try:
-        client = AsyncIOMotorClient(MONGO_URI)
-        # Test if the client is connected by listing the databases
-        await client.server_info()  # This will raise an error if the connection fails
-        return client
-    except Exception as e:
-        print(f"Failed to connect to MongoDB: {e}")
-        return None
-        client = AsyncIOMotorClient(MONGO_URI)
-        # Test if the client is connected by listing the databases
-        await client.server_info()  # This will raise an error if the connection fails
-        return client
-    except Exception as e:
-        print(f"Failed to connect to MongoDB: {e}")
-        return None
+        db = client[user_id]
+        collection = db["session"]
+        sessions_cursor = collection.find({}, {"session_id": 1, "session_name": 1, "_id": 0})
+        sessions = await sessions_cursor.to_list(length=None)  # length=None returns all results
+        if not sessions:
+            raise DocumentNotFoundError(f"User has no sessions.")
+        
+        return sessions
 
-# Function to test the MongoDB connection
-async def test_connection():
-    client = await get_mongo_client()  # Get the MongoDB client
-    if client:
-        try:
-            # List all databases
-            db_names = await client.list_database_names()
-            
-            if db_names:
-                print("Databases found:", db_names)
-            else:
-                print("No databases found.")
-        except Exception as e:
-            print(f"Error fetching databases: {e}")
-    else:
-        print("Failed to connect to MongoDB.")
+    except PyMongoError as e:
+        raise MongoOperationError(f"Database error: {str(e)}")
 
-
-if __name__ == "__main__":
-
-    sessions = asyncio.run(get_sessions("user12"))
-    print(sessions)
     
-    # messages = asyncio.run(get_messages("user1", "session1"))
-    # print(messages)
-    
-    # asyncio.run(test_connection())
+async def insert_message(user_id: str, session_id: str, msg: Message) -> str:
+    try:
+        db = client[user_id]
+        collection = db["session"]
+        msg_dict = msg.dict()
 
-    # asyncio.run(insert_message("user1", "session1", {"message": "Hello"}))
+        session_exists = await collection.find_one({"session_id": session_id})
+        if not session_exists:
+            raise CollectionNotFoundError(f"Session '{session_id}' not found in database.")
+        
+        msg_id = str(uuid4())
+        msg_dict["message_id"] = msg_id
+        result = await collection.update_one(
+                {"session_id": session_id},  # filter
+                {"$push": {"messages": msg_dict}}  # push to array field
+            ) 
+
+        if result.modified_count == 0:
+            raise MongoOperationError("Message was not inserted.")
+
+        return msg_id
+    
+    except PyMongoError as e:
+        raise MongoOperationError(f"Database error: {str(e)}")
+    
+async def get_messages(user_id: str, session_id: str):
+    try:
+        db = client[user_id]
+        collection = db["session"]
+        
+        session_doc = await collection.find_one({"session_id": session_id}, {"_id": 0})
+        
+        if not session_doc:
+            raise CollectionNotFoundError(f"Session '{session_id}' not found.")
+
+        messages_list = session_doc.get("messages", [])
+        # return {"messages": messages_list}
+        if not messages_list:
+            raise DocumentNotFoundError(f"Session '{session_id}' has no messages.")
+
+        for msg in messages_list:
+            if "timestamp" in msg:
+                msg["timestamp"] = timestampToISOFormat(msg["timestamp"])
+        
+        return session_doc
+    except PyMongoError as e:
+        raise MongoOperationError(f"Database error: {str(e)}")
